@@ -1,64 +1,46 @@
 import pandas as pd
+import streamlit as st
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
 
-# Load KPI Summary and Claims Data
-kpi_summary = pd.read_excel("kpi_summary.xlsx")
-claims_df = pd.read_excel("cleaned_claims_data.xlsx")
+# Load Data
+@st.cache_data
+def load_data():
+    df = pd.read_excel("kpi_summary.xlsx")
+    return df
 
-# Generate the PDF report with visualizations
-pdf_path = "reserving_analysis_report_final.pdf"
+data = load_data()
 
-with PdfPages(pdf_path) as pdf:
-    # Reserve Timeliness by Region
-    plt.figure(figsize=(12, 6))
-    plt.bar(kpi_summary['Claim Prov'], kpi_summary['Reserve_Timely'], color='#4C72B0')
-    plt.axhline(90, color='red', linestyle='--', linewidth=2, label='Target: 90%')
-    plt.xlabel("Region")
-    plt.ylabel("Reserve Timeliness (%)")
-    plt.title("Reserve Timeliness by Region")
-    plt.legend()
-    pdf.savefig()
-    plt.close()
+# Title
+st.title("Interactive Reserving Standards Dashboard")
 
-    # Mapping Accuracy by Region
-    plt.figure(figsize=(12, 6))
-    plt.bar(kpi_summary['Claim Prov'], kpi_summary['Mapping_Correct'], color='#55A868')
-    plt.axhline(95, color='red', linestyle='--', linewidth=2, label='Target: 95%')
-    plt.xlabel("Region")
-    plt.ylabel("Mapping Accuracy (%)")
-    plt.title("Mapping Accuracy by Region")
-    plt.legend()
-    pdf.savefig()
-    plt.close()
+# KPI Summary
+st.subheader("Key Performance Indicators")
+reserve_timely_avg = data['Reserve_Timely'].mean()
+mapping_accuracy_avg = data['Mapping_Correct'].mean()
+days_to_reserve_avg = data['Days_to_Reserve'].mean()
 
-    # Days to Reserve Distribution
-    plt.figure(figsize=(12, 6))
-    plt.hist(claims_df['Days_to_Reserve'].dropna(), bins=30, color='#C44E52', edgecolor='black')
-    plt.axvline(7, color='blue', linestyle='dashed', linewidth=2, label="7-Day Standard")
-    plt.xlabel("Days to Reserve")
-    plt.ylabel("Frequency")
-    plt.title("Distribution of Days to Reserve")
-    plt.legend()
-    pdf.savefig()
-    plt.close()
+st.metric("Reserve Timeliness (%)", f"{reserve_timely_avg:.2f}")
+st.metric("Mapping Accuracy (%)", f"{mapping_accuracy_avg:.2f}")
+st.metric("Average Days to Reserve", f"{days_to_reserve_avg:.2f} days")
 
-    # Summary Text Page
-    plt.figure(figsize=(10, 5))
-    plt.axis('off')
-    summary_text = (
-        "Reserving Standards Analysis Report\n\n"
-        "Key Findings:\n"
-        "1. Reserve Timeliness: 4.2% (Target: 90%)\n"
-        "2. Mapping Accuracy: 11.71% (Target: 95%)\n"
-        "3. Average Days to Reserve: 25.56 Days (Target: 7 Days)\n\n"
-        "Recommendations:\n"
-        "- Implement automated alerts for reserve delays.\n"
-        "- Train adjusters on Reserve Mapping standards.\n"
-        "- Streamline workflows and prioritize high-value claims.\n"
-    )
-    plt.text(0.5, 0.5, summary_text, fontsize=12, ha='center', va='center')
-    pdf.savefig()
-    plt.close()
+# Bar Charts for Regions
+st.subheader("Reserve Timeliness by Region")
+st.bar_chart(data.set_index("Claim Prov")['Reserve_Timely'])
 
-print(f"PDF report generated successfully: {pdf_path}")
+st.subheader("Mapping Accuracy by Region")
+st.bar_chart(data.set_index("Claim Prov")['Mapping_Correct'])
+
+# Histogram for Days to Reserve
+st.subheader("Distribution of Days to Reserve")
+fig, ax = plt.subplots()
+ax.hist(data['Days_to_Reserve'].dropna(), bins=30, color='skyblue', edgecolor='black')
+ax.axvline(7, color='red', linestyle='dashed', linewidth=2, label="7-Day Standard")
+plt.legend()
+st.pyplot(fig)
+
+# Upload Option
+st.subheader("Upload New Data")
+uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
+if uploaded_file:
+    new_data = pd.read_excel(uploaded_file)
+    st.write(new_data)
