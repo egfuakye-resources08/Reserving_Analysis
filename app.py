@@ -1,56 +1,64 @@
-import os.path
-
-import altair as alt
 import pandas as pd
-import streamlit as st
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+# Load KPI Summary and Claims Data
+kpi_summary = pd.read_excel("kpi_summary.xlsx")
+claims_df = pd.read_excel("cleaned_claims_data.xlsx")
 
-st.title("Top 5%" " income share")
-st.markdown("Share of income received by the richest 5%" " of the population.")
-DATA = os.path.join(HERE, "data.csv")
+# Generate the PDF report with visualizations
+pdf_path = "reserving_analysis_report_final.pdf"
 
+with PdfPages(pdf_path) as pdf:
+    # Reserve Timeliness by Region
+    plt.figure(figsize=(12, 6))
+    plt.bar(kpi_summary['Claim Prov'], kpi_summary['Reserve_Timely'], color='#4C72B0')
+    plt.axhline(90, color='red', linestyle='--', linewidth=2, label='Target: 90%')
+    plt.xlabel("Region")
+    plt.ylabel("Reserve Timeliness (%)")
+    plt.title("Reserve Timeliness by Region")
+    plt.legend()
+    pdf.savefig()
+    plt.close()
 
-@st.cache_data
-def load_data(nrows):
-    return pd.read_csv("./data.csv", nrows=nrows)
+    # Mapping Accuracy by Region
+    plt.figure(figsize=(12, 6))
+    plt.bar(kpi_summary['Claim Prov'], kpi_summary['Mapping_Correct'], color='#55A868')
+    plt.axhline(95, color='red', linestyle='--', linewidth=2, label='Target: 95%')
+    plt.xlabel("Region")
+    plt.ylabel("Mapping Accuracy (%)")
+    plt.title("Mapping Accuracy by Region")
+    plt.legend()
+    pdf.savefig()
+    plt.close()
 
+    # Days to Reserve Distribution
+    plt.figure(figsize=(12, 6))
+    plt.hist(claims_df['Days_to_Reserve'].dropna(), bins=30, color='#C44E52', edgecolor='black')
+    plt.axvline(7, color='blue', linestyle='dashed', linewidth=2, label="7-Day Standard")
+    plt.xlabel("Days to Reserve")
+    plt.ylabel("Frequency")
+    plt.title("Distribution of Days to Reserve")
+    plt.legend()
+    pdf.savefig()
+    plt.close()
 
-data_load_state = st.text("Loading data...")
-data = load_data(10000)
-data_load_state.text("")
-
-countries = st.multiselect(
-    "Countries",
-    list(sorted({d for d in data["Entity"]})),
-    default=["Australia", "China", "Germany", "Japan", "United States"],
-)
-earliest_year = data["Year"].min()
-latest_year = data["Year"].max()
-min_year, max_year = st.slider(
-    "Year Range",
-    min_value=int(earliest_year),
-    max_value=int(latest_year),
-    value=[int(earliest_year), int(latest_year)],
-)
-filtered_data = data[data["Entity"].isin(countries)]
-filtered_data = filtered_data[filtered_data["Year"] >= min_year]
-filtered_data = filtered_data[filtered_data["Year"] <= max_year]
-
-chart = (
-    alt.Chart(filtered_data)
-    .mark_line()
-    .encode(
-        x=alt.X("Year", axis=alt.Axis(format="d")),
-        y=alt.Y("Percent", axis=alt.Axis(format="~s")),
-        color="Entity",
-        strokeDash="Entity",
+    # Summary Text Page
+    plt.figure(figsize=(10, 5))
+    plt.axis('off')
+    summary_text = (
+        "Reserving Standards Analysis Report\n\n"
+        "Key Findings:\n"
+        "1. Reserve Timeliness: 4.2% (Target: 90%)\n"
+        "2. Mapping Accuracy: 11.71% (Target: 95%)\n"
+        "3. Average Days to Reserve: 25.56 Days (Target: 7 Days)\n\n"
+        "Recommendations:\n"
+        "- Implement automated alerts for reserve delays.\n"
+        "- Train adjusters on Reserve Mapping standards.\n"
+        "- Streamline workflows and prioritize high-value claims.\n"
     )
-)
-st.altair_chart(chart, use_container_width=True)
+    plt.text(0.5, 0.5, summary_text, fontsize=12, ha='center', va='center')
+    pdf.savefig()
+    plt.close()
 
-if st.checkbox("Show raw data"):
-    st.subheader("Raw data")
-    st.write(filtered_data)
-
-st.markdown("Source: <https://ourworldindata.org/grapher/top-5-income-share>")
+print(f"PDF report generated successfully: {pdf_path}")
